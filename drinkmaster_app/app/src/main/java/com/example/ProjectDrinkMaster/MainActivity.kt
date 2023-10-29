@@ -35,6 +35,9 @@ import com.google.zxing.WriterException
 import com.google.zxing.common.BitMatrix
 import com.google.zxing.qrcode.QRCodeWriter
 import java.io.FileNotFoundException
+// rating imports
+import android.widget.RatingBar
+import android.widget.TextView
 
 // main page
 class MainActivity : AppCompatActivity() {
@@ -76,6 +79,8 @@ class MainActivity : AppCompatActivity() {
                 drink.put("id", "$i") // id
                 drink.put("name", "drink$i") //name
                 drink.put("description", "description$i") // description
+                drink.put("rating", "0") // rating - initialize with 0
+                drink.put("timesRated", "0") // initialize with 0 to be able to calculate rating
 
                 ingredient1.put("id", (0..5).random()) //placeholder id
                 ingredient1.put("amount", (1..2).random()) //placeholder amount
@@ -359,6 +364,12 @@ class MainActivity : AppCompatActivity() {
         val dialog = builder.create()
         qr_code = customView.findViewById<ImageView>(R.id.qr_code)//qr code
 
+        val reviewButton = customView.findViewById<Button>(R.id.button_leave_review) // Replace `your_button_id` with the actual ID of your button
+        reviewButton.setOnClickListener {
+            dialog.dismiss() // Dismiss the receipt dialog
+            RatingBarPopUpBox() // Open the RatingBar popup
+        }
+
         val data = readOffDrinkValueFile()
         val drinkName =
             data.getJSONObject("drinks").getJSONObject("drink$last_drink_ordered").getString("name")
@@ -392,6 +403,70 @@ class MainActivity : AppCompatActivity() {
         }
         return null
     }
+
+    // initializes and shows the rating bar pop-up
+    private fun RatingBarPopUpBox() {
+        // Create and set the custom view for the AlertDialog
+        val customView = LayoutInflater.from(this).inflate(R.layout.star_review, null)
+        val dialog = AlertDialog.Builder(this)
+            .setView(customView)
+            .create()
+
+        val ratingBar = customView.findViewById<RatingBar>(R.id.ratingBar)
+        val submitButton = customView.findViewById<Button>(R.id.button_rating)
+        val cancelButton = customView.findViewById<Button>(R.id.button_cancel_rating)
+        val averageRatingView = customView.findViewById<TextView>(R.id.average_rating_view)
+
+        submitButton.setOnClickListener {
+            it.isEnabled = false
+            cancelButton.isEnabled = false
+
+            val newRating = ratingBar.rating // Getting the rating from the RatingBar
+
+            when (last_drink_ordered) { // Using a when statement to handle different cases
+                1, 2, 3, 4 -> { // Assuming last_drink_ordered contains the drinkId
+
+                    // Read the existing JSON data
+                    val data = readOffDrinkValueFile()
+
+                    // Get the drink object
+                    val drink = data.getJSONObject("drinks").getJSONObject("drink$last_drink_ordered")
+
+                    // Get the current rating and the number of times the drink has been rated
+                    var currentRating = drink.getDouble("rating")
+                    var timesRated = drink.optInt("timesRated") // If timesRated is not present, defaults to 0
+
+                    // Calculate the new average rating
+                    currentRating = ((currentRating * timesRated) + newRating) / (timesRated + 1)
+
+                    val formattedRating = String.format("%.1f", currentRating)
+
+                    // Update the drink object
+                    drink.put("rating", formattedRating)
+                    drink.put("timesRated", timesRated + 1) // Increment the timesRated
+
+                    val averageRatingView = findViewById<TextView>(R.id.average_rating_view)
+                    averageRatingView.text = "Rating: $formattedRating"
+
+                    // Write the updated JSON data back to the file
+                    MainActivity.Companion.writeToDrinkValueFile(data)
+                }
+            }
+
+            customView.postDelayed({
+                dialog.dismiss() // Close the dialog 3 seconds after the rating is submitted
+            }, 3000)
+        }
+
+        // Handle the cancel button click event to dismiss the dialog
+        cancelButton.setOnClickListener {
+            dialog.dismiss() // Close the dialog immediately when cancel is pressed
+        }
+
+        // Show the dialog
+        dialog.show()
+    }
+
 
 
     //the following functions get executed when a drink button gets pressed. then will add +1 to amount sold per drink.
@@ -429,12 +504,16 @@ class MainActivity : AppCompatActivity() {
 
         var name1 = ""
         var desc1 = ""
+        var rating1 = ""
         var name2 = ""
         var desc2 = ""
+        var rating2 = ""
         var name3 = ""
         var desc3 = ""
+        var rating3 = ""
         var name4 = ""
         var desc4 = ""
+        var rating4 = ""
 
         // reads off values from json file, will reset the to default values if an error occurs
         try {
@@ -451,6 +530,11 @@ class MainActivity : AppCompatActivity() {
 
             name4 = data.getJSONObject("drink4").getString("name")
             desc4 = data.getJSONObject("drink4").getString("description")
+
+            rating1 = data.getJSONObject("drink1").getString("rating")
+            rating2 = data.getJSONObject("drink2").getString("rating")
+            rating3 = data.getJSONObject("drink3").getString("rating")
+            rating4 = data.getJSONObject("drink4").getString("rating")
 
             data.getJSONObject("drink1").getInt("price")
 
@@ -475,28 +559,32 @@ class MainActivity : AppCompatActivity() {
             desc1,
             R.drawable.mint_drink,
             name1,
-            R.drawable.ordergintonic
+            R.drawable.ordergintonic,
+            "Rating: $rating1"
         )
         drinkList.add(drink)
         drink = ItemsViewModel(
             desc2,
             R.drawable.straberry_drink,
             name2,
-            R.drawable.ordercolalemon
+            R.drawable.ordercolalemon,
+            "Rating: $rating2"
         )
         drinkList.add(drink)
         drink = ItemsViewModel(
             desc3,
             R.drawable.lemonade,
             name3,
-            R.drawable.orderrumcola
+            R.drawable.orderrumcola,
+            "Rating: $rating3"
         )
         drinkList.add(drink)
         drink = ItemsViewModel(
             desc4,
             R.drawable.water,
             name4,
-            R.drawable.orderlemonade
+            R.drawable.orderlemonade,
+            "Rating: $rating4"
         )
         drinkList.add(drink)
         drinkAdapter.notifyDataSetChanged()
